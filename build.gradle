@@ -1,0 +1,94 @@
+tasks.withType(JavaCompile) {
+  options.encoding = "UTF-8"
+}
+
+buildscript {
+    repositories {
+        jcenter()
+        mavenCentral()
+        mavenLocal()
+        maven {
+            name = "sonatype"
+            url = "https://oss.sonatype.org/content/repositories/snapshots/"
+        }
+        maven {
+            name = "forge"
+            url = "http://files.minecraftforge.net/maven"
+        }
+        maven {
+            name = 'sponge'
+            url = 'http://repo.spongepowered.org/maven'
+        }
+    }
+	ext {
+		ktapiVersion = '0.0.3'
+	}
+    dependencies {
+        classpath 'net.minecraftforge.gradle:ForgeGradle:' + project.forgeGradleVersion
+        classpath 'org.spongepowered:mixingradle:0.5-SNAPSHOT'
+    }
+}
+
+
+apply plugin: 'net.minecraftforge.gradle.liteloader'
+apply plugin: 'org.spongepowered.mixin'
+
+group = "de.125m125.kt" // http://maven.apache.org/guides/mini/guide-naming-conventions.html
+archivesBaseName = "kadcontrade"
+
+minecraft {
+    // these values are defined in the gradle.properties file, so that this file does not need to be altered
+    version = project.mcVersion
+    mappings = project.mcMappings
+    runDir = "run"
+}
+
+sourceSets {
+    main {
+        // Refmap declaration must match the refmap name specified in the json config
+        ext.refMap = "mixins.example.refmap.json"
+    }
+}
+
+mixin {
+    // liteloader does not do runtime deobfuscation, so in production we use "notch names", mixin needs to know this
+    defaultObfuscationEnv notch
+}
+
+litemod {
+    json {
+        name = "Kadcontrade"
+        mcversion = project.mcVersion
+        description = "Erlaubt es ingame mit kadcontrade zu interagieren" 
+        mixinConfigs += "mixins.example.json"
+    }
+}
+
+jar {
+    // The litemod task above generates the litemod.json dynamically, you can replace it with a resource if you want more control
+    from litemod.outputs
+    from {
+        (configurations.includeMeInJar).collect { it.isDirectory() ? it : zipTree(it) }
+    } {
+        exclude "META-INF/*.SF"
+        exclude "META-INF/*.DSA"
+        exclude "META-INF/*.RSA"
+    }
+}
+
+repositories {
+ 	mavenLocal()
+}
+
+configurations {
+  includeMeInJar
+  compile.extendsFrom includeMeInJar 
+}
+
+dependencies {
+	includeMeInJar "de.125m125.kt:ktapi-retrofit:${ktapiVersion}"
+	includeMeInJar "de.125m125.kt:ktapi-smartCache:${ktapiVersion}"
+	includeMeInJar "de.125m125.kt:ktapi-okhttpWebsocket:${ktapiVersion}"
+	includeMeInJar 'com.squareup.okhttp3:logging-interceptor:3.5.0'
+	includeMeInJar group: 'org.slf4j', name: 'slf4j-simple', version: '1.7.25'
+}
