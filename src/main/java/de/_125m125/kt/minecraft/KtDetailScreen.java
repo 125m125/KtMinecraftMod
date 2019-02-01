@@ -13,7 +13,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import de._125m125.kt.ktapi.core.BUY_SELL;
-import de._125m125.kt.ktapi.core.NotificationListener;
+import de._125m125.kt.ktapi.core.KtNotificationManager;
 import de._125m125.kt.ktapi.core.PAYOUT_TYPE;
 import de._125m125.kt.ktapi.core.entities.HistoryEntry;
 import de._125m125.kt.ktapi.core.entities.Item;
@@ -21,12 +21,13 @@ import de._125m125.kt.ktapi.core.entities.Payout;
 import de._125m125.kt.ktapi.core.entities.Trade;
 import de._125m125.kt.ktapi.core.results.Callback;
 import de._125m125.kt.ktapi.core.results.WriteResult;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiLabel;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.GuiTextField;
 
-public class KtDetailScreen extends GuiScreen {
+public class KtDetailScreen<T> extends GuiScreen {
 	private static final int STATUS_LABEL = -1;
 	private static final int ITEM_LABEL = 0;
 	private static final int HISTORY_LABEL = 1;
@@ -39,12 +40,13 @@ public class KtDetailScreen extends GuiScreen {
 	private static final int PAYOUT_AMOUNT = 16;
 	private static final int PAYOUT_TYPE_FIELD = 17;
 	private static final int PAYOUT_SUBMIT = 18;
+	private static final int BACK = 19;
 	private static final int PAYOUT_LABELS = 1000; // to infinity
 
 	private static final int ITEM_START = 20;
 	private static final int HISTORY_START = 40;
 	private static final int TRADE_START = 60;
-	private static final int PAYOUT_START = 160;
+	private static final int PAYOUT_START = 180;
 
 	private final long[] tradeIds = { 0, 0 };
 
@@ -52,7 +54,7 @@ public class KtDetailScreen extends GuiScreen {
 	private Item item;
 	private List<Payout> payouts;
 	private boolean isKadis;
-	private List<CompletableFuture<NotificationListener>> listeners = new ArrayList<>();
+	private List<CompletableFuture<T>> listeners = new ArrayList<>();
 
 	private Map<Integer, GuiLabel> labels = new HashMap<>();
 	private Map<Integer, GuiTextField> textFields = new HashMap<>();
@@ -71,31 +73,29 @@ public class KtDetailScreen extends GuiScreen {
 
 		@Override
 		public void onError(Throwable t) {
+			t.printStackTrace();
 			setStatusLabelText("Unbekannter Fehler.");
 		}
 
 	};
+	private KtNotificationManager<T> notificationManager;
+	private int offset;
 
 	private void setStatusLabelText(String string) {
 		addLabel(new GuiLabel(fontRenderer, STATUS_LABEL, width / 8, 5, width * 3 / 4, 20, 0xFFFFFF), string);
 	}
 
-	public KtDetailScreen(LiteModKadconTrade kt, Item item) {
+	public KtDetailScreen(LiteModKadconTrade kt, KtNotificationManager<T> manager, Item item, int offset) {
 		this.kt = kt;
+		notificationManager = manager;
 		this.item = item;
+		this.offset = offset;
 		isKadis = "-1".equals(item.getId());
 	}
 
 	@Override
 	public void initGui() {
-		listeners.add(kt.getNotificationManager().subscribeToItems(n -> updateInventory(), kt.getUser(), true));
-		listeners.add(kt.getNotificationManager().subscribeToItems(n -> updateInventory(), kt.getUser(), false));
-		listeners.add(kt.getNotificationManager().subscribeToPayouts(n -> updatePayouts(), kt.getUser(), true));
-		listeners.add(kt.getNotificationManager().subscribeToPayouts(n -> updatePayouts(), kt.getUser(), false));
-		listeners.add(kt.getNotificationManager().subscribeToTrades(n -> updateOrders(), kt.getUser(), true));
-		listeners.add(kt.getNotificationManager().subscribeToTrades(n -> updateOrders(), kt.getUser(), false));
-		listeners.add(kt.getNotificationManager().subscribeToHistory(n -> updateHistory()));
-
+		super.initGui();
 		updateInventory();
 		updateHistory();
 		if (!isKadis) {
@@ -111,12 +111,33 @@ public class KtDetailScreen extends GuiScreen {
 					new GuiTextField(PAYOUT_TYPE_FIELD, fontRenderer, width / 8 * 5, PAYOUT_START, width / 8, 20));
 			addButton(new GuiButton(PAYOUT_SUBMIT, width / 8 * 6 + 1, PAYOUT_START, width / 8, 20, "Auszahlen"));
 		}
-		super.initGui();
+		addButton(new GuiButton(BACK, width * 3 / 4, ITEM_START, width / 8, 20, "Zurück"));
+		GuiLabel guiLabel = new GuiLabel(fontRenderer, -8230, width / 8, PAYOUT_START-20, width*3 / 4, 20,
+				0xFFFFFF);
+		if (isKadis) {
+			guiLabel.addLine("Auszahlungstyp: Kadcon->0");
+		} else {
+			guiLabel.addLine("Auszahlungstyp: Lieferung->0, Auszahlungsbox -> Nummer des Servers");
+		}
+		labelList.add(guiLabel);
+		if (kt.getCurrentPermissions().mayReadItems()) {
+			listeners.add(notificationManager.subscribeToItems(n -> updateInventory(), kt.getUser(), true));
+			listeners.add(notificationManager.subscribeToItems(n -> updateInventory(), kt.getUser(), false));
+		}
+		if (kt.getCurrentPermissions().mayReadPayouts()) {
+			listeners.add(notificationManager.subscribeToPayouts(n -> updatePayouts(), kt.getUser(), true));
+			listeners.add(notificationManager.subscribeToPayouts(n -> updatePayouts(), kt.getUser(), false));
+		}
+		if (kt.getCurrentPermissions().mayReadOrders()) {
+			listeners.add(notificationManager.subscribeToTrades(n -> updateOrders(), kt.getUser(), true));
+			listeners.add(notificationManager.subscribeToTrades(n -> updateOrders(), kt.getUser(), false));
+		}
+		listeners.add(notificationManager.subscribeToHistory(n -> updateHistory()));
 	}
 
 	@Override
 	public void onGuiClosed() {
-		listeners.forEach(kt.getNotificationManager()::unsubscribe);
+		listeners.forEach(notificationManager::unsubscribe);
 		super.onGuiClosed();
 	}
 
@@ -161,6 +182,9 @@ public class KtDetailScreen extends GuiScreen {
 		case CANCEL + 1:
 			kt.getRequester().cancelTrade(tradeIds[1]).addCallback(this.writeCallback);
 			break;
+		case BACK:
+			Minecraft.getMinecraft().displayGuiScreen(new KtOverviewScreen(kt, offset));
+			break;
 		case PAYOUT_SUBMIT:
 			PAYOUT_TYPE type = null;
 			switch (textFields.get(PAYOUT_TYPE_FIELD).getText()) {
@@ -192,7 +216,25 @@ public class KtDetailScreen extends GuiScreen {
 			}
 			try {
 				kt.getRequester().createPayout(kt.getUser(), type, item.getId(),
-						textFields.get(PAYOUT_AMOUNT).getText().replaceAll(",", "."));
+						textFields.get(PAYOUT_AMOUNT).getText().replaceAll(",", ".")).addCallback(new Callback<WriteResult<Payout>>() {
+
+							@Override
+							public void onError(Throwable t) {
+								t.printStackTrace();
+								setStatusLabelText("Fehlgeschlagen: Unbekannter Fehler.");
+							}
+
+							@Override
+							public void onFailure(int status, String message, String hrm) {
+								setStatusLabelText("Fehlgeschlagen: "+hrm);
+							}
+
+							@Override
+							public void onSuccess(int status, WriteResult<Payout> result) {
+								setStatusLabelText("Auszahlungsanfrage erfolgreich erstellt.");
+							}
+							
+						});
 			} catch (NumberFormatException e) {
 				setStatusLabelText("Fehlgeschlagen: Ungültige Menge");
 			}
@@ -239,7 +281,8 @@ public class KtDetailScreen extends GuiScreen {
 				public void onSuccess(int status, List<Payout> result) {
 					payouts = result;
 					labelList.removeIf(l -> l.id >= PAYOUT_LABELS);
-					buttonList.removeIf(l -> l.id >= PAYOUT_LABELS);
+					if (buttonList != null)
+						buttonList.removeIf(l -> l.id >= PAYOUT_LABELS);
 					payoutButtons.clear();
 
 					TreeMap<EntrySpecifier, Double> collect = result.stream()
@@ -322,8 +365,12 @@ public class KtDetailScreen extends GuiScreen {
 			public void onSuccess(int status, List<HistoryEntry> result) {
 				GuiLabel guiLabel = new GuiLabel(fontRenderer, HISTORY_LABEL, width / 8, HISTORY_START, width * 3 / 4,
 						20, 0xFFFFFF);
-				guiLabel.addLine("Aktueller Preis: " + result.get(0).getClose() + "  " + percentageString(7, result)
-						+ "  " + percentageString(30, result));
+				if (!result.isEmpty()) {
+					guiLabel.addLine("Aktueller Preis: " + result.get(0).getClose() + "  " + percentageString(7, result)
+							+ "  " + percentageString(30, result));
+				} else {
+					guiLabel.addLine("Für dieses Item gibt es noch keine Statistiken.");
+				}
 				GuiLabel put = labels.put(HISTORY_LABEL, guiLabel);
 				if (put != null) {
 					labelList.remove(put);
@@ -352,6 +399,7 @@ public class KtDetailScreen extends GuiScreen {
 			@Override
 			public void onSuccess(int status, List<Trade> result) {
 				boolean[] findings = { false, false };
+				System.out.println(result);
 				result.stream().filter(t -> t.getMaterialId().equals(item.getId())).forEach(t -> {
 					if (t.isBuy()) {
 						updateTrade(t, 0);
@@ -385,6 +433,12 @@ public class KtDetailScreen extends GuiScreen {
 		buttonList.removeIf(b -> b.id == CREATE + offset);
 		textFields.remove(AMOUNT + offset);
 		textFields.remove(PRICE + offset);
+		GuiLabel remove = labels.remove(TRADE_HELP_TEXTS + offset * 2);
+		if (remove != null)
+			labelList.remove(remove);
+		remove = labels.remove(TRADE_HELP_TEXTS + 1 + offset * 2);
+		if (remove != null)
+			labelList.remove(remove);
 
 		tradeIds[offset] = t.getId();
 
@@ -419,9 +473,10 @@ public class KtDetailScreen extends GuiScreen {
 			return;
 		if (textFields.get(AMOUNT + offset) != null)
 			return;
-
-		buttonList.removeIf(b -> b.id == CANCEL + offset);
-		buttonList.removeIf(b -> b.id == TAKEOUT + offset);
+		if (buttonList != null) {
+			buttonList.removeIf(b -> b.id == CANCEL + offset);
+			buttonList.removeIf(b -> b.id == TAKEOUT + offset);
+		}
 		GuiLabel remove = labels.remove(AMOUNT + offset);
 		if (remove != null) {
 			labelList.remove(remove);

@@ -1,18 +1,21 @@
 package de._125m125.kt.minecraft;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FilenameFilter;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
+import java.io.InputStream;
+import java.security.GeneralSecurityException;
+import java.security.KeyStore;
+import java.security.cert.Certificate;
+import java.security.cert.X509Certificate;
+import java.util.Enumeration;
 
-import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.core.appender.ConsoleAppender;
-import org.apache.logging.log4j.core.appender.FileAppender;
-import org.apache.logging.log4j.core.layout.PatternLayout;
+import org.bouncycastle.asn1.x500.RDN;
+import org.bouncycastle.asn1.x500.style.BCStyle;
+import org.bouncycastle.asn1.x500.style.IETFUtils;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
 import org.lwjgl.input.Keyboard;
-import org.slf4j.LoggerFactory;
-import org.xml.sax.ext.LexicalHandler;
 
 import com.google.common.eventbus.EventBus;
 import com.google.gson.annotations.Expose;
@@ -28,29 +31,28 @@ import com.mumfrey.liteloader.modconfig.ExposableOptions;
 import de._125m125.kt.ktapi.core.KtCachingRequester;
 import de._125m125.kt.ktapi.core.KtNotificationManager;
 import de._125m125.kt.ktapi.core.KtRequester;
-import de._125m125.kt.ktapi.core.NotificationListener;
 import de._125m125.kt.ktapi.core.SingleUserKtRequester;
 import de._125m125.kt.ktapi.core.entities.Permissions;
 import de._125m125.kt.ktapi.core.results.Callback;
+import de._125m125.kt.ktapi.core.users.CertificateUser;
 import de._125m125.kt.ktapi.core.users.KtUserStore;
 import de._125m125.kt.ktapi.core.users.TokenUser;
-import de._125m125.kt.ktapi.core.users.TokenUserKey;
+import de._125m125.kt.ktapi.core.users.UserKey;
+import de._125m125.kt.ktapi.okhttp.websocket.KtOkHttpWebsocket;
 import de._125m125.kt.ktapi.retrofit.KtRetrofit;
-import de._125m125.kt.ktapi.smartCache.KtCachingRequesterIml;
+import de._125m125.kt.ktapi.retrofitRequester.KtRetrofitRequester;
+import de._125m125.kt.ktapi.smartCache.KtSmartCache;
 import de._125m125.kt.ktapi.websocket.KtWebsocketManager;
-import de._125m125.kt.ktapi.websocket.events.MessageReceivedEvent;
 import de._125m125.kt.ktapi.websocket.events.listeners.AutoReconnectionHandler;
 import de._125m125.kt.ktapi.websocket.events.listeners.KtWebsocketNotificationHandler;
 import de._125m125.kt.ktapi.websocket.events.listeners.OfflineMessageHandler;
 import de._125m125.kt.ktapi.websocket.events.listeners.SessionHandler;
-import de._125m125.kt.ktapi.websocket.okhttp.KtOkHttpWebsocket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.network.INetHandler;
 import net.minecraft.network.play.server.SPacketJoinGame;
 import net.minecraft.util.text.TextComponentString;
-import okhttp3.logging.HttpLoggingInterceptor.Level;
 
 /**
  * This is a very simple example LiteMod, it draws an analogue clock on the
@@ -78,20 +80,23 @@ public class LiteModKadconTrade implements Tickable, JoinGameListener, ShutdownL
 	private String tid = "";
 	@Expose
 	@SerializedName("tkn")
-	private String tkn = "";
+	private EncryptedData encrTkn = null;
 
+	private String tkn;
 	private LoginState state;
 
 	private KtUserStore userStore = new KtUserStore();
-	private KtRequester<TokenUserKey> requester;
-	private KtNotificationManager<TokenUserKey> notificationManager;
-	private KtCachingRequester<TokenUserKey> cachingRequester;
-	private TokenUserKey userKey;
-	private SingleUserKtRequester<TokenUserKey> suRequester;
+	private KtRetrofitRequester requester;
+	private KtNotificationManager<?> notificationManager;
+	private KtCachingRequester cachingRequester;
+	private UserKey userKey;
+	private SingleUserKtRequester suRequester;
 	private Permissions permissions;
-	private List<CompletableFuture<NotificationListener>> listeners = new ArrayList<>();
+
+	private EncryptionHelper encryptionHelper = new EncryptionHelper();
 
 	public final EventBus eventBus = new EventBus("Kadcontrade");
+	private File configPath;
 
 	/**
 	 * Default constructor. All LiteMods must have a default constructor. In general
@@ -133,14 +138,8 @@ public class LiteModKadconTrade implements Tickable, JoinGameListener, ShutdownL
 	 */
 	@Override
 	public void init(File configPath) {
+		this.configPath = configPath;
 		LiteLoader.getInput().registerKeyBinding(ktKeyBinding);
-		requester = KtRetrofit.createDefaultRequester(userStore, null);
-		final KtOkHttpWebsocket ws = new KtOkHttpWebsocket("wss://kt.125m125.de/api/websocket");
-		notificationManager = new KtWebsocketNotificationHandler<TokenUserKey>(userStore);
-		KtWebsocketManager.builder(ws).addDefaultParsers().addListener(new OfflineMessageHandler())
-				.addListener(new SessionHandler()).addListener(notificationManager)
-				.addListener(new AutoReconnectionHandler()).buildAndOpen();
-		cachingRequester = new KtCachingRequesterIml<>(requester, notificationManager);
 	}
 
 	/**
@@ -157,24 +156,104 @@ public class LiteModKadconTrade implements Tickable, JoinGameListener, ShutdownL
 	@Override
 	public void onTick(Minecraft minecraft, float partialTicks, boolean inGame, boolean clock) {
 		if (Minecraft.isGuiEnabled() && inGame && minecraft.inGameHasFocus && ktKeyBinding.isPressed()) {
-			minecraft.displayGuiScreen(new KtOverviewScreen(this));
+			if (getLoginState() != LoginState.SUCCESS) {
+				minecraft.displayGuiScreen(new KtLoginScreen(this));
+			} else {
+				minecraft.displayGuiScreen(new KtOverviewScreen(this));
+			}
 		}
 	}
 
 	@Override
 	public void onJoinGame(INetHandler netHandler, SPacketJoinGame joinGamePacket, ServerData serverData,
 			RealmsServer realmsServer) {
-		setUser(new TokenUser(uid, tid, tkn));
+//		setUser(new TokenUser(uid, tid, tkn)); TODO
 	}
-	
-	public void setUser(TokenUser user) {
+
+	public void usePassword(String password) {
+		String tkn = encryptionHelper.aesDecrypt(encrTkn, password);
+		if (tkn == null) {
+			throw new IllegalArgumentException("wrong password");
+		}
+		setUser(new TokenUser(uid, tid, tkn), password);
+	}
+
+	public void loadP12(char[] password) throws IOException, GeneralSecurityException {
+		File certificateFile = getCertificateCandidates()[0];
+		try (InputStream keyInput = new FileInputStream(certificateFile)) {
+			final KeyStore keyStore = KeyStore.getInstance("PKCS12");
+			keyStore.load(keyInput, password);
+			final Enumeration<String> aliases = keyStore.aliases();
+			while (aliases.hasMoreElements()) {
+				final Certificate certificate = keyStore.getCertificate(aliases.nextElement());
+				if (certificate == null || !(certificate instanceof X509Certificate)) {
+					continue;
+				}
+				final JcaX509CertificateHolder jcaX509CertificateHolder = new JcaX509CertificateHolder(
+						(X509Certificate) certificate);
+				final RDN[] rdn = jcaX509CertificateHolder.getSubject().getRDNs(BCStyle.UID);
+				if (rdn.length != 1 || rdn[0].isMultiValued()) {
+					continue;
+				}
+				String uid = IETFUtils.valueToString(rdn[0].getFirst().getValue());
+				setUser(new CertificateUser(uid, certificateFile, password));
+				return;
+			}
+			throw new IOException("no certificate found");
+		}
+	}
+
+	private File[] getCertificateCandidates() {
+		return configPath.listFiles(new FilenameFilter() {
+			@Override
+			public boolean accept(File dir, String name) {
+				return "certificate.p12".equals(name);
+			}
+		});
+	}
+
+	private void setUser(CertificateUser user) {
+		this.uid = user.getUserId();
+		this.tid = "";
+		this.tkn = "";
+		this.encrTkn = null;
+//		LiteLoader.getInstance().writeConfig(this);
+		closeRequesters();
+
+		userStore.add(user);
+		userKey = user.getKey();
+		requester = KtRetrofit.createClientCertificateRequester(userStore, user.getKey(), null);
+		buildDecoratingRequesters(userKey, requester);
+		checkPermissions();
+	}
+
+	public void setUser(TokenUser user, String password) {
 		this.uid = user.getUserId();
 		this.tid = user.getTokenId();
 		this.tkn = user.getToken();
+		this.encrTkn = encryptionHelper.aesEncrypt(tkn, password);
 		LiteLoader.getInstance().writeConfig(this);
+		closeRequesters();
+
 		userStore.add(user);
 		userKey = user.getKey();
-		suRequester = new SingleUserKtRequester<>(userKey, cachingRequester); // TODO cachingRequester
+		requester = KtRetrofit.createDefaultRequester(userStore, null);
+		buildDecoratingRequesters(userKey, requester);
+		checkPermissions();
+	}
+
+	private void buildDecoratingRequesters(UserKey key, KtRetrofitRequester requester) {
+		final KtOkHttpWebsocket ws = new KtOkHttpWebsocket("wss://kt.125m125.de/api/websocket",
+				requester.getOkHttpClient());
+		notificationManager = new KtWebsocketNotificationHandler(userStore);
+		KtWebsocketManager.builder(ws).addDefaultParsers().addListener(new OfflineMessageHandler())
+				.addListener(new SessionHandler()).addListener(notificationManager)
+				.addListener(new AutoReconnectionHandler()).buildAndOpen();
+		cachingRequester = new KtSmartCache(requester, notificationManager);
+		suRequester = new SingleUserKtRequester(key, cachingRequester); // TODO cachingRequester
+	}
+
+	private void checkPermissions() {
 		suRequester.getPermissions().addCallback(new Callback<Permissions>() {
 
 			@Override
@@ -188,7 +267,7 @@ public class LiteModKadconTrade implements Tickable, JoinGameListener, ShutdownL
 			public void onFailure(int status, String message, String humanReadableMessage) {
 				if (status == -1) {
 					Minecraft.getMinecraft().player.sendMessage(new TextComponentString(
-							"Kadcontrade funktioniert nicht mit dem mitgelieferten JRE. Bitte stelle Minecraft so ein, dass es eine JRE>1.8u160 verwendet."));
+							"Kadcontrade funktioniert nicht mit der mitgelieferten JRE. Bitte stelle Minecraft so ein, dass es eine JRE>1.8u151 verwendet."));
 					setLoginState(LoginState.ILLEGAL_JRE);
 				} else {
 					Minecraft.getMinecraft().player.sendMessage(
@@ -205,14 +284,32 @@ public class LiteModKadconTrade implements Tickable, JoinGameListener, ShutdownL
 				t.printStackTrace();
 			}
 		});
-		
 	}
 
-	public TokenUserKey getUser() {
+	private void closeRequesters() {
+		if (suRequester != null)
+			try {
+				suRequester.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		if (cachingRequester != null)
+			try {
+				cachingRequester.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		if (notificationManager != null)
+			notificationManager.disconnect();
+		if (requester != null)
+			requester.close();
+	}
+
+	public UserKey getUser() {
 		return userKey;
 	}
 
-	public SingleUserKtRequester<TokenUserKey> getRequester() {
+	public SingleUserKtRequester getRequester() {
 		return suRequester;
 	}
 
@@ -220,7 +317,7 @@ public class LiteModKadconTrade implements Tickable, JoinGameListener, ShutdownL
 		if (state == LoginState.SUCCESS)
 			return permissions;
 		else
-			return new Permissions();
+			return Permissions.NO_PERMISSIONS;
 	}
 
 	public LoginState getLoginState() {
@@ -228,38 +325,42 @@ public class LiteModKadconTrade implements Tickable, JoinGameListener, ShutdownL
 	}
 
 	public void setLoginState(LoginState state) {
-		listeners.forEach(notificationManager::unsubscribe);
 		this.state = state;
 		eventBus.post(state);
 		if (state == LoginState.SUCCESS) {
-			notificationManager.subscribeToItems(m->Minecraft.getMinecraft().player.sendMessage(new TextComponentString(
-						"Dein Itemstand hat sich verändert.")), userKey, false);
-			notificationManager.subscribeToPayouts(m -> Minecraft.getMinecraft().player.sendMessage(new TextComponentString(
-					"Eine Auszahlungen wurde bearbeitet.")), userKey, false);
-			notificationManager.subscribeToTrades(m->Minecraft.getMinecraft().player.sendMessage(new TextComponentString(
-					"Für eine Order wurde ein Gegenangebot gefunden.")), userKey, false);
+			if (permissions.mayReadItems())
+				notificationManager.subscribeToItems(
+						m -> Minecraft.getMinecraft().player
+								.sendMessage(new TextComponentString("Dein Itemstand hat sich verändert.")),
+						userKey, false);
+			if (permissions.mayReadPayouts())
+				notificationManager.subscribeToPayouts(
+						m -> Minecraft.getMinecraft().player
+								.sendMessage(new TextComponentString("Eine Auszahlungen wurde bearbeitet.")),
+						userKey, false);
+			if (permissions.mayReadOrders())
+				notificationManager.subscribeToTrades(
+						m -> Minecraft.getMinecraft().player.sendMessage(
+								new TextComponentString("Für eine Order wurde ein Gegenangebot gefunden.")),
+						userKey, false);
 		}
 	}
 
 	@Override
 	public void onShutDown() {
-		System.out.println(notificationManager);
-		try {
-			cachingRequester.close();
-		} catch (IOException e1) {
-			e1.printStackTrace();
-		}
-		System.out.println(notificationManager);
-		notificationManager.disconnect();
-		try {
-			requester.close();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+		closeRequesters();
 	}
 
-	public KtNotificationManager<TokenUserKey> getNotificationManager() {
+	public KtNotificationManager<?> getNotificationManager() {
 		return notificationManager;
+	}
+
+	public boolean hasEncryptedTkn() {
+		return encrTkn != null;
+	}
+
+	public boolean p12Present() {
+		return getCertificateCandidates().length > 0;
 	}
 
 }

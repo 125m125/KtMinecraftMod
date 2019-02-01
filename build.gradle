@@ -21,7 +21,7 @@ buildscript {
         }
     }
 	ext {
-		ktapiVersion = '0.0.3'
+		ktapiVersion = '0.0.4-SNAPSHOT'
 	}
     dependencies {
         classpath 'net.minecraftforge.gradle:ForgeGradle:' + project.forgeGradleVersion
@@ -90,5 +90,6 @@ dependencies {
 	includeMeInJar "de.125m125.kt:ktapi-smartCache:${ktapiVersion}"
 	includeMeInJar "de.125m125.kt:ktapi-okhttpWebsocket:${ktapiVersion}"
 	includeMeInJar 'com.squareup.okhttp3:logging-interceptor:3.5.0'
+	includeMeInJar "org.bouncycastle:bcpkix-jdk15on:1.60"
 	includeMeInJar group: 'org.slf4j', name: 'slf4j-simple', version: '1.7.25'
 }
