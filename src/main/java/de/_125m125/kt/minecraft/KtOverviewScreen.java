@@ -55,7 +55,7 @@ public class KtOverviewScreen extends GuiScreen {
 			itemButtons.add(addButton(
 					new GuiButton(ITEMBUTTON_ID_OFFSET + i, this.width / 8, 100 + i * 25, this.width * 3 / 4, 20, "")));
 		}
-		addButton(new GuiButton(99, this.width/4, 225, this.width/2, 20, "Kontoauszug auslesen"));
+		addButton(new GuiButton(99, this.width / 4, 225, this.width / 2, 20, "Kontoauszug auslesen"));
 		scroll(0);
 	}
 
@@ -66,22 +66,24 @@ public class KtOverviewScreen extends GuiScreen {
 		if (!kt.getCurrentPermissions().mayReadMessages()) {
 			return;
 		}
-		kt.getRequester().getMessages(0,10).addCallback(new Callback<List<Message>>() {
+		kt.getRequester().getMessages(0, 10).addCallback(new Callback<List<Message>>() {
 			@Override
 			public void onSuccess(int status, List<Message> result) {
 				messageLabel = new GuiLabel(fontRenderer, 0, width / 16, 28, width * 7 / 8, 50, 0xFFFFFF);
 				for (int i = 0; i < result.size(); i++)
-					messageLabel.addLine(result.get(i).getTime().format(DateTimeFormatter.ofPattern("dd.MM.yyyy hh:mm"))
+					messageLabel.addLine(result.get(i).getTime().format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))
 							+ " " + result.get(i).getMessage());
 				labelList.add(messageLabel);
 			}
 
 			@Override
 			public void onFailure(int status, String message, String humanReadableMessage) {
+				System.out.println("message failure " + status+": "+message);
 			}
 
 			@Override
 			public void onError(Throwable t) {
+				System.out.println("message error " + t);
 				t.printStackTrace();
 			}
 		});
@@ -183,8 +185,8 @@ public class KtOverviewScreen extends GuiScreen {
 				kt.getRequester().getItems().addCallback(new Callback<List<Item>>() {
 					@Override
 					public void onSuccess(int status, List<Item> result) {
-						Minecraft.getMinecraft()
-								.displayGuiScreen(new KtDetailScreen<>(kt, kt.getNotificationManager(), result.get(item), currentScroll));
+						Minecraft.getMinecraft().displayGuiScreen(
+								new KtDetailScreen<>(kt, kt.getNotificationManager(), result.get(item), currentScroll));
 					}
 
 					@Override
@@ -201,8 +203,8 @@ public class KtOverviewScreen extends GuiScreen {
 				kt.getRequester().getItemNames().addCallback(new Callback<List<ItemName>>() {
 					@Override
 					public void onSuccess(int status, List<ItemName> result) {
-						Minecraft.getMinecraft()
-								.displayGuiScreen(new KtDetailScreen<>(kt, kt.getNotificationManager(), new Item(result.get(item).getId(), result.get(item).getName(), -1), currentScroll));
+						Minecraft.getMinecraft().displayGuiScreen(new KtDetailScreen<>(kt, kt.getNotificationManager(),
+								new Item(result.get(item).getId(), result.get(item).getName(), -1), currentScroll));
 					}
 
 					@Override
@@ -234,7 +236,7 @@ public class KtOverviewScreen extends GuiScreen {
 				}
 
 			});
-		}else {
+		} else {
 			super.actionPerformed(button);
 		}
 	}

@@ -32,8 +32,8 @@ public class KtLoginScreen extends GuiScreen {
 	private static final int TID_ID = 1;
 	private static final int TKN_ID = 2;
 	private static final int PWD_ID = 3;
-	private static final int P12_PW = 4;
-	private static final int PWD_ID_2 = 5;
+	private static final int P12_PW = 6;
+	private static final int PWD_ID_2 = 8;
 
 	private Map<Integer, GuiLabel> labels = new HashMap<>();
 	private Map<Integer, GuiTextField> fields = new HashMap<>();
@@ -50,24 +50,14 @@ public class KtLoginScreen extends GuiScreen {
 		super.initGui();
 		kt.eventBus.register(this);
 		allowUserInput = true;
-		if (kt.p12Present()) {
-			addLabel(new GuiLabel(fontRenderer, 1000001, width / 8, 20, this.width * 3 / 8, 20, 0xFFFFFF),
-					"p12 Passwort: ");
-			fields.put(P12_PW, new GuiTextField(P12_PW, fontRenderer, this.width / 2, 20, this.width * 3 / 8, 20));
-			addButton(new GuiButton(P12_LOGIN, this.width / 8, 40, this.width * 3 / 4, 20, "Login"));
-		}
-		if (kt.hasEncryptedTkn()) {
-			addLabel(new GuiLabel(fontRenderer, 1000002, width / 8, 65, this.width * 3 / 8, 20, 0xFFFFFF),
-					"KtMinecraftMod Passwort: ");
-			fields.put(PWD_ID_2, new GuiTextField(PWD_ID_2, fontRenderer, this.width / 2, 65, this.width * 3 / 8, 20));
 
-			addButton(new GuiButton(EXISTING_LOGIN, this.width / 8, 85, this.width * 3 / 4, 20, "Login"));
-		}
 		{
 			addLabel(new GuiLabel(fontRenderer, 1000003, width / 8, 110, this.width * 3 / 8, 20, 0xFFFFFF),
 					"Benutzer ID: ");
 			fields.put(UID_ID, new GuiTextField(UID_ID, fontRenderer, this.width / 2, 110, this.width * 3 / 8, 20));
 			fields.get(UID_ID).setMaxStringLength(7);
+			if (!kt.p12Present() && !kt.hasEncryptedTkn())
+				fields.get(UID_ID).setFocused(true);
 			if (kt.getUser() != null)
 				fields.get(UID_ID).setText(kt.getUser().getUserId());
 
@@ -89,7 +79,22 @@ public class KtLoginScreen extends GuiScreen {
 
 			addButton(new GuiButton(NEW_LOGIN, this.width / 8, 190, this.width * 3 / 4, 20, "Benutzer verwenden"));
 		}
+		if (kt.hasEncryptedTkn()) {
+			addLabel(new GuiLabel(fontRenderer, 1000002, width / 8, 65, this.width * 3 / 8, 20, 0xFFFFFF),
+					"KtMinecraftMod Passwort: ");
+			fields.put(PWD_ID_2, new GuiTextField(PWD_ID_2, fontRenderer, this.width / 2, 65, this.width * 3 / 8, 20));
+			if (!kt.p12Present())
+				fields.get(PWD_ID_2).setFocused(true);
 
+			addButton(new GuiButton(EXISTING_LOGIN, this.width / 8, 85, this.width * 3 / 4, 20, "Login"));
+		}
+		if (kt.p12Present()) {
+			addLabel(new GuiLabel(fontRenderer, 1000001, width / 8, 20, this.width * 3 / 8, 20, 0xFFFFFF),
+					"p12 Passwort: ");
+			fields.put(P12_PW, new GuiTextField(P12_PW, fontRenderer, this.width / 2, 20, this.width * 3 / 8, 20));
+			fields.get(P12_PW).setFocused(true);
+			addButton(new GuiButton(P12_LOGIN, this.width / 8, 40, this.width * 3 / 4, 20, "Login"));
+		}
 		onLoginStateChange(kt.getLoginState());
 	}
 
@@ -122,7 +127,63 @@ public class KtLoginScreen extends GuiScreen {
 
 	@Override
 	protected void keyTyped(char typedChar, int keyCode) throws IOException {
-		fields.values().stream().filter(GuiTextField::isFocused).forEach(t -> t.textboxKeyTyped(typedChar, keyCode));
+		if (keyCode == 15) { // tab
+			if (isShiftKeyDown()) {
+				fields.values().stream().filter(GuiTextField::isFocused).findAny().ifPresent(f -> {
+					GuiTextField next = fields.get(f.getId() - 1);
+					if (next != null) {
+						f.setFocused(false);
+						next.setFocused(true);
+					}
+				});
+			} else {
+				fields.values().stream().filter(GuiTextField::isFocused).findAny().ifPresent(f -> {
+					GuiTextField next = fields.get(f.getId() + 1);
+					if (next != null) {
+						f.setFocused(false);
+						next.setFocused(true);
+					}
+				});
+			}
+		} else if (keyCode == 28) {// enter
+			fields.values().stream().filter(GuiTextField::isFocused).findAny().ifPresent(f -> {
+				switch (f.getId()) {
+				case UID_ID:
+				case TID_ID:
+				case TKN_ID:
+				case PWD_ID:
+					buttonList.stream().filter(b -> b.id == NEW_LOGIN).findAny().ifPresent(t -> {
+						try {
+							actionPerformed(t);
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+					});
+					break;
+				case P12_PW:
+					buttonList.stream().filter(b -> b.id == P12_LOGIN).findAny().ifPresent(t -> {
+						try {
+							actionPerformed(t);
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+					});
+					break;
+				case PWD_ID_2:
+					buttonList.stream().filter(b -> b.id == EXISTING_LOGIN).findAny().ifPresent(t -> {
+						try {
+							actionPerformed(t);
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+					});
+					break;
+				}
+			});
+		} else {
+			fields.values().stream().filter(GuiTextField::isFocused)
+					.forEach(t -> t.textboxKeyTyped(typedChar, keyCode));
+		}
 		super.keyTyped(typedChar, keyCode);
 	}
 

@@ -12,9 +12,9 @@ import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
-import de._125m125.kt.ktapi.core.BUY_SELL;
+import de._125m125.kt.ktapi.core.BuySell;
 import de._125m125.kt.ktapi.core.KtNotificationManager;
-import de._125m125.kt.ktapi.core.PAYOUT_TYPE;
+import de._125m125.kt.ktapi.core.PayoutType;
 import de._125m125.kt.ktapi.core.entities.HistoryEntry;
 import de._125m125.kt.ktapi.core.entities.Item;
 import de._125m125.kt.ktapi.core.entities.Payout;
@@ -38,7 +38,7 @@ public class KtDetailScreen<T> extends GuiScreen {
 	private static final int CANCEL = 10; // to 11
 	private static final int TRADE_HELP_TEXTS = 12; // to 15
 	private static final int PAYOUT_AMOUNT = 16;
-	private static final int PAYOUT_TYPE_FIELD = 17;
+	private static final int PayoutType_FIELD = 17;
 	private static final int PAYOUT_SUBMIT = 18;
 	private static final int BACK = 19;
 	private static final int PAYOUT_LABELS = 1000; // to infinity
@@ -63,16 +63,19 @@ public class KtDetailScreen<T> extends GuiScreen {
 
 		@Override
 		public void onSuccess(int status, WriteResult<Trade> result) {
+			System.out.println("success   "+result);
 			setStatusLabelText("Erfolg!");
 		}
 
 		@Override
 		public void onFailure(int status, String message, String humanReadableMessage) {
+			System.out.println("failure   "+message);
 			setStatusLabelText("Fehlschlag: " + humanReadableMessage);
 		}
 
 		@Override
 		public void onError(Throwable t) {
+			System.out.println("error "+t);
 			t.printStackTrace();
 			setStatusLabelText("Unbekannter Fehler.");
 		}
@@ -107,8 +110,8 @@ public class KtDetailScreen<T> extends GuiScreen {
 			textFields.put(PAYOUT_AMOUNT,
 					new GuiTextField(PAYOUT_AMOUNT, fontRenderer, width / 8 * 2, PAYOUT_START, width / 8 * 2, 20));
 			addLabel(new GuiLabel(fontRenderer, -101, width / 8 * 4, PAYOUT_START, width / 8, 20, 0xFFFFFF), " Art");
-			textFields.put(PAYOUT_TYPE_FIELD,
-					new GuiTextField(PAYOUT_TYPE_FIELD, fontRenderer, width / 8 * 5, PAYOUT_START, width / 8, 20));
+			textFields.put(PayoutType_FIELD,
+					new GuiTextField(PayoutType_FIELD, fontRenderer, width / 8 * 5, PAYOUT_START, width / 8, 20));
 			addButton(new GuiButton(PAYOUT_SUBMIT, width / 8 * 6 + 1, PAYOUT_START, width / 8, 20, "Auszahlen"));
 		}
 		addButton(new GuiButton(BACK, width * 3 / 4, ITEM_START, width / 8, 20, "Zurück"));
@@ -186,28 +189,28 @@ public class KtDetailScreen<T> extends GuiScreen {
 			Minecraft.getMinecraft().displayGuiScreen(new KtOverviewScreen(kt, offset));
 			break;
 		case PAYOUT_SUBMIT:
-			PAYOUT_TYPE type = null;
-			switch (textFields.get(PAYOUT_TYPE_FIELD).getText()) {
+			PayoutType type = null;
+			switch (textFields.get(PayoutType_FIELD).getText()) {
 			case "0":
 				if (isKadis) {
-					type = PAYOUT_TYPE.KADCON;
+					type = PayoutType.KADCON;
 				} else {
-					type = PAYOUT_TYPE.DELIVERY;
+					type = PayoutType.DELIVERY;
 				}
 				break;
 			case "1":
 				if (!isKadis) {
-					type = PAYOUT_TYPE.PAYOUT_BOX_S1;
+					type = PayoutType.PAYOUT_BOX_S1;
 					break;
 				}
 			case "2":
 				if (!isKadis) {
-					type = PAYOUT_TYPE.PAYOUT_BOX_S2;
+					type = PayoutType.PAYOUT_BOX_S2;
 					break;
 				}
 			case "3":
 				if (!isKadis) {
-					type = PAYOUT_TYPE.PAYOUT_BOX_S3;
+					type = PayoutType.PAYOUT_BOX_S3;
 					break;
 				}
 			default:
@@ -269,7 +272,7 @@ public class KtDetailScreen<T> extends GuiScreen {
 			setStatusLabelText("Fehlgeschlagen: Ungültiger Preis");
 			return;
 		}
-		kt.getRequester().createTrade(offset == 0 ? BUY_SELL.BUY : BUY_SELL.SELL, item, amount, ppi)
+		kt.getRequester().createTrade(offset == 0 ? BuySell.BUY : BuySell.SELL, item, amount, ppi)
 				.addCallback(writeCallback);
 	}
 

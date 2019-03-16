@@ -30,7 +30,6 @@ import com.mumfrey.liteloader.modconfig.ExposableOptions;
 
 import de._125m125.kt.ktapi.core.KtCachingRequester;
 import de._125m125.kt.ktapi.core.KtNotificationManager;
-import de._125m125.kt.ktapi.core.KtRequester;
 import de._125m125.kt.ktapi.core.SingleUserKtRequester;
 import de._125m125.kt.ktapi.core.entities.Permissions;
 import de._125m125.kt.ktapi.core.results.Callback;
@@ -40,8 +39,8 @@ import de._125m125.kt.ktapi.core.users.TokenUser;
 import de._125m125.kt.ktapi.core.users.UserKey;
 import de._125m125.kt.ktapi.okhttp.websocket.KtOkHttpWebsocket;
 import de._125m125.kt.ktapi.retrofit.KtRetrofit;
-import de._125m125.kt.ktapi.retrofitRequester.KtRetrofitRequester;
-import de._125m125.kt.ktapi.smartCache.KtSmartCache;
+import de._125m125.kt.ktapi.retrofit.requester.KtRetrofitRequester;
+import de._125m125.kt.ktapi.smartcache.KtSmartCache;
 import de._125m125.kt.ktapi.websocket.KtWebsocketManager;
 import de._125m125.kt.ktapi.websocket.events.listeners.AutoReconnectionHandler;
 import de._125m125.kt.ktapi.websocket.events.listeners.KtWebsocketNotificationHandler;
@@ -222,7 +221,7 @@ public class LiteModKadconTrade implements Tickable, JoinGameListener, ShutdownL
 
 		userStore.add(user);
 		userKey = user.getKey();
-		requester = KtRetrofit.createClientCertificateRequester(userStore, user.getKey(), null);
+		requester = KtRetrofit.createClientCertificateRequester("miecraftmod", userStore, user.getKey(), null);
 		buildDecoratingRequesters(userKey, requester);
 		checkPermissions();
 	}
@@ -237,7 +236,7 @@ public class LiteModKadconTrade implements Tickable, JoinGameListener, ShutdownL
 
 		userStore.add(user);
 		userKey = user.getKey();
-		requester = KtRetrofit.createDefaultRequester(userStore, null);
+		requester = KtRetrofit.createDefaultRequester("miecraftmod", userStore, null);
 		buildDecoratingRequesters(userKey, requester);
 		checkPermissions();
 	}
