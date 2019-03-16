@@ -21,7 +21,7 @@ buildscript {
         }
     }
 	ext {
-		ktapiVersion = '0.0.4-SNAPSHOT'
+		ktapiVersion = '1.0.0'
 	}
     dependencies {
         classpath 'net.minecraftforge.gradle:ForgeGradle:' + project.forgeGradleVersion
