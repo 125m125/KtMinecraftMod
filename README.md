@@ -2,9 +2,9 @@
 Diese Minecraft Modifikation ermöglicht es, aus Minecraft heraus mit Kadcontrade zu interagieren.
 
 ## Installation
-- Zuerst muss Liteloader 1.12 installiert werden: https://www.liteloader.com/explore/docs/user:install
-- Anschließend kann die Mod aus den Releases ( https://github.com/125m125/KtMinecraftMod/releases ) heruntergeladen und in .minecraft/mods/1.12 abgelegt werden.
-- Wenn nun das Liteloader 1.12-Profil gestartet wird, kann die Mod genutzt werden, sobald einer Welt (lokal oder online) beigetreten wurde
+- Zuerst muss Liteloader 1.12 oder 1.12.2 installiert werden: https://www.liteloader.com/explore/docs/user:install
+- Anschließend kann die Mod aus den Releases ( https://github.com/125m125/KtMinecraftMod/releases ) heruntergeladen und in .minecraft/mods/1.12 bzw. .minecraft/mods/1.12 abgelegt werden.
+- Wenn nun das Liteloader 1.12 bzw. 1.12.2-Profil gestartet wird, kann die Mod genutzt werden, sobald einer Welt (lokal oder online) beigetreten wurde
 
 ## Anmeldung
 - Nach der Installation kann die Benutzeroberfläche mit F12 aktiviert werden (in den Einstellungen änderbar)
@@ -35,5 +35,6 @@ Wenn das Token/Zertifikat nicht alle möglichen Berechtigungen hat, stehen einig
 Die für https://kt.125m125.de benötigten Verschlüsselungsalgorithmen funktionieren mit der in Minecraft mitgelieferten JRE möglicherweise nicht.
 In diesem Fall muss für Minecraft manuell eine andere JRE eingestellt werden.
 Dafür muss, sofern es noch nicht geschehen, zuerst eine JRE1.8 auf dem Computer installiert werden ( https://java.com/de/download/help/download_options.xml ).
-Anschließend kann im Launcher unter Profile->LiteLoader 1.12->Java-Programmdatei auf die installierte javaw.exe verwiesen werden (Windows default ist C:\Program Files\Java\jre1.8.0_<Version>\bin\javaw.exe).
+Anschließend kann im Launcher unter Profile->LiteLoader 1.12 bzw. 1.12.2->Java-Programmdatei auf die installierte javaw.exe verwiesen werden (Windows default ist C:\Program Files\Java\jre1.8.0_<Version>\bin\javaw.exe).
 Danach sollte diese Warnung nicht mehr auftreten.
+Beachte, dass nach einem Java-Update der Pfad unter Umständen neu gesetzt werden muss.
