@@ -89,7 +89,7 @@ dependencies {
 	includeMeInJar "de.125m125.kt:ktapi-retrofit:${ktapiVersion}"
 	includeMeInJar "de.125m125.kt:ktapi-smartCache:${ktapiVersion}"
 	includeMeInJar "de.125m125.kt:ktapi-okhttpWebsocket:${ktapiVersion}"
-	includeMeInJar 'com.squareup.okhttp3:logging-interceptor:3.13.1'
+	includeMeInJar 'com.squareup.okhttp3:logging-interceptor:3.14.0'
 	includeMeInJar "org.bouncycastle:bcpkix-jdk15on:1.61"
 	includeMeInJar group: 'org.slf4j', name: 'slf4j-simple', version: '1.7.26'
 }
