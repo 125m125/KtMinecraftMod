@@ -90,6 +90,6 @@ dependencies {
 	includeMeInJar "de.125m125.kt:ktapi-smartCache:${ktapiVersion}"
 	includeMeInJar "de.125m125.kt:ktapi-okhttpWebsocket:${ktapiVersion}"
 	includeMeInJar 'com.squareup.okhttp3:logging-interceptor:3.14.2'
-	includeMeInJar "org.bouncycastle:bcpkix-jdk15on:1.62"
+	includeMeInJar "org.bouncycastle:bcpkix-jdk15on:1.67"
 	includeMeInJar group: 'org.slf4j', name: 'slf4j-simple', version: '1.7.28'
 }
